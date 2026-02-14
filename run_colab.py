@@ -12,7 +12,7 @@ def print_menu():
     print("\n" + "="*70)
     print("🎓 پروژه مدلسازی داده‌های کنکور ایران")
     print("="*70)
-    print("1️⃣  مرحله ۱: مدل‌های پایه")
+    print("1️⃣  مرحله ۱: مدل‌های پایه (MLP, RF, GBM)")
     print("2️⃣  مرحله ۲: TabTransformer")
     print("3️⃣  مرحله ۳: جاسازی عددی")
     print("4️⃣  مرحله ۴: تحلیل نهایی")
@@ -30,8 +30,7 @@ def run_stage1():
 def run_stage2():
     print("\n🚀 اجرای مرحله ۲...")
     import stage2_tabtransformer
-    results, trainer, report = stage2_tabtransformer.run_stage2()
-    return results
+    return stage2_tabtransformer.run_stage2()
 
 
 def run_stage3():
