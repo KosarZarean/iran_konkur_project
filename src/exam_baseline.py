@@ -1,6 +1,6 @@
 """
-مدل‌های پایه برای داده‌های کنکور ایران
-شامل ۳ مدل اصلی: MLP، Random Forest و Gradient Boosting
+مدل‌های پایه و سنتی برای داده‌های کنکور ایران
+شامل: رگرسیون خطی، درخت تصمیم، جنگل تصادفی، XGBoost، LightGBM، MLP و ...
 """
 
 import time
@@ -8,8 +8,15 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.neural_network import MLPRegressor
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from catboost import CatBoostRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import warnings
 warnings.filterwarnings('ignore')
@@ -18,7 +25,7 @@ warnings.filterwarnings('ignore')
 class BaselineModels:
     """
     کلاس آموزش و ارزیابی مدل‌های پایه
-    شامل ۳ مدل: MLP، Random Forest، Gradient Boosting
+    شامل ۱۵ مدل مختلف رگرسیون
     """
     
     def __init__(self, X_train, y_train, X_val, y_val, X_test, y_test, task_type='regression'):
@@ -40,7 +47,7 @@ class BaselineModels:
         y_test : array
             برچسب‌های آزمایش
         task_type : str
-            نوع وظیفه (فعلاً فقط regression)
+            نوع وظیفه (فعلاً فقط regression پشتیبانی می‌شود)
         """
         self.X_train = X_train
         self.y_train = y_train
@@ -62,45 +69,50 @@ class BaselineModels:
     
     def define_models(self):
         """
-        تعریف ۳ مدل پایه
+        تعریف ۱۵ مدل پایه مختلف
         """
         print("\n📋 تعریف مدل‌های پایه...")
         
         self.models = {
-            'MLP': MLPRegressor(
-                hidden_layer_sizes=(64, 32),
-                activation='relu',
-                solver='adam',
-                max_iter=500,
-                random_state=42,
-                early_stopping=True,
-                validation_fraction=0.1,
-                n_iter_no_change=10
-            ),
+            # 1. مدل‌های خطی
+            'Linear Regression': LinearRegression(),
+            'Ridge Regression': Ridge(alpha=1.0, random_state=42),
+            'Lasso Regression': Lasso(alpha=0.1, random_state=42),
+            'Elastic Net': ElasticNet(alpha=0.1, l1_ratio=0.5, random_state=42),
             
-            'Random Forest': RandomForestRegressor(
-                n_estimators=100,
-                max_depth=10,
-                min_samples_split=5,
-                min_samples_leaf=2,
-                random_state=42,
-                n_jobs=-1
-            ),
+            # 2. درخت‌ها
+            'Decision Tree': DecisionTreeRegressor(max_depth=10, min_samples_split=5, random_state=42),
+            'Random Forest': RandomForestRegressor(n_estimators=100, max_depth=10, min_samples_split=5, 
+                                                  n_jobs=-1, random_state=42),
+            'Gradient Boosting': GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, 
+                                                          max_depth=5, random_state=42),
+            'AdaBoost': AdaBoostRegressor(n_estimators=100, learning_rate=0.1, random_state=42),
             
-            'Gradient Boosting': GradientBoostingRegressor(
-                n_estimators=100,
-                learning_rate=0.1,
-                max_depth=5,
-                min_samples_split=5,
-                min_samples_leaf=2,
-                subsample=0.8,
-                random_state=42
-            )
+            # 3. مدل‌های مبتنی بر نزدیک‌ترین همسایه
+            'KNN': KNeighborsRegressor(n_neighbors=5, weights='distance', n_jobs=-1),
+            
+            # 4. ماشین بردار پشتیبان
+            'SVR (linear)': SVR(kernel='linear', C=1.0),
+            'SVR (rbf)': SVR(kernel='rbf', C=100, gamma=0.1),
+            
+            # 5. مدل‌های پیشرفته
+            'XGBoost': XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1,
+                                    subsample=0.8, colsample_bytree=0.8, random_state=42, verbosity=0),
+            'LightGBM': LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1,
+                                     num_leaves=31, random_state=42, verbose=-1),
+            'CatBoost': CatBoostRegressor(iterations=100, learning_rate=0.1, depth=6,
+                                         verbose=False, random_state=42),
+            
+            # 6. شبکه عصبی
+            'MLP': MLPRegressor(hidden_layer_sizes=(128, 64, 32), activation='relu',
+                               solver='adam', max_iter=500, random_state=42)
         }
         
-        print(f"✅ {len(self.models)} مدل تعریف شد:")
-        for name in self.models.keys():
-            print(f"   - {name}")
+        print(f"✅ {len(self.models)} مدل تعریف شد")
+        
+        # نمایش لیست مدل‌ها
+        for i, (name, _) in enumerate(self.models.items(), 1):
+            print(f"   {i:2d}. {name}")
     
     def train_and_evaluate(self, verbose=True):
         """
@@ -116,9 +128,9 @@ class BaselineModels:
         pd.DataFrame
             نتایج همه مدل‌ها
         """
-        print("\n" + "="*60)
+        print("\n" + "="*80)
         print("🚀 شروع آموزش مدل‌های پایه")
-        print("="*60)
+        print("="*80)
         
         for name, model in self.models.items():
             if verbose:
@@ -170,9 +182,9 @@ class BaselineModels:
         # مرتب‌سازی بر اساس RMSE
         results_df = results_df.sort_values('Test RMSE')
         
-        print("\n" + "="*60)
+        print("\n" + "="*80)
         print("✅ آموزش همه مدل‌ها کامل شد")
-        print("="*60)
+        print("="*80)
         
         return results_df
     
@@ -183,7 +195,7 @@ class BaselineModels:
         پارامترها:
         -----------
         metric : str
-            معیار ارزیابی ('Test RMSE', 'Test R2')
+            معیار ارزیابی ('Test RMSE', 'Test R2', ...)
         
         Returns:
         --------
@@ -206,12 +218,14 @@ class BaselineModels:
         
         return best_model, best_value
     
-    def plot_comparison(self, save_path='plots/baseline_comparison.jpg'):
+    def plot_comparison(self, metric='Test RMSE', save_path='plots/baseline_comparison.jpg'):
         """
         رسم نمودار مقایسه مدل‌ها
         
         پارامترها:
         -----------
+        metric : str
+            معیار مقایسه
         save_path : str
             مسیر ذخیره نمودار
         """
@@ -220,74 +234,50 @@ class BaselineModels:
             return
         
         df = pd.DataFrame(self.results)
+        df = df.sort_values(metric)
         
-        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+        # انتخاب ۱۰ مدل برتر
+        top_models = df.head(10)
         
-        colors = ['#3498db', '#2ecc71', '#e74c3c']
+        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         
-        # 1. RMSE Comparison
-        axes[0, 0].bar(df['Model'], df['Test RMSE'], color=colors, edgecolor='black')
-        axes[0, 0].set_xlabel('Model')
-        axes[0, 0].set_ylabel('RMSE')
-        axes[0, 0].set_title('Test RMSE Comparison (lower is better)')
-        axes[0, 0].grid(True, alpha=0.3, axis='y')
+        # 1. RMSE مقایسه
+        axes[0, 0].barh(top_models['Model'], top_models['Test RMSE'], 
+                       color='skyblue', edgecolor='black')
+        axes[0, 0].set_xlabel('RMSE (lower is better)')
+        axes[0, 0].set_title('Top 10 Models - RMSE Comparison')
+        axes[0, 0].grid(True, alpha=0.3, axis='x')
         
-        # 2. MAE Comparison
-        axes[0, 1].bar(df['Model'], df['Test MAE'], color=colors, edgecolor='black')
-        axes[0, 1].set_xlabel('Model')
-        axes[0, 1].set_ylabel('MAE')
-        axes[0, 1].set_title('Test MAE Comparison (lower is better)')
-        axes[0, 1].grid(True, alpha=0.3, axis='y')
+        # 2. R² مقایسه
+        axes[0, 1].barh(top_models['Model'], top_models['Test R2'], 
+                       color='lightgreen', edgecolor='black')
+        axes[0, 1].set_xlabel('R² (higher is better)')
+        axes[0, 1].set_title('Top 10 Models - R² Comparison')
+        axes[0, 1].grid(True, alpha=0.3, axis='x')
+        axes[0, 1].axvline(x=0, color='red', linestyle='--', alpha=0.5)
         
-        # 3. R² Comparison
-        axes[0, 2].bar(df['Model'], df['Test R2'], color=colors, edgecolor='black')
-        axes[0, 2].set_xlabel('Model')
-        axes[0, 2].set_ylabel('R²')
-        axes[0, 2].set_title('Test R² Comparison (higher is better)')
-        axes[0, 2].grid(True, alpha=0.3, axis='y')
-        axes[0, 2].axhline(y=0, color='red', linestyle='--', alpha=0.5)
-        
-        # 4. Training Time
-        axes[1, 0].bar(df['Model'], df['Time (s)'], color=colors, edgecolor='black')
-        axes[1, 0].set_xlabel('Model')
-        axes[1, 0].set_ylabel('Time (seconds)')
+        # 3. زمان آموزش
+        axes[1, 0].barh(top_models['Model'], top_models['Time (s)'], 
+                       color='salmon', edgecolor='black')
+        axes[1, 0].set_xlabel('Training Time (seconds)')
         axes[1, 0].set_title('Training Time Comparison')
-        axes[1, 0].grid(True, alpha=0.3, axis='y')
+        axes[1, 0].grid(True, alpha=0.3, axis='x')
         
-        # 5. Train vs Test RMSE
-        x = np.arange(len(df))
+        # 4. Train vs Test RMSE
+        x = np.arange(len(top_models))
         width = 0.35
         
-        axes[1, 1].bar(x - width/2, df['Train RMSE'], width, label='Train', color='skyblue', edgecolor='black')
-        axes[1, 1].bar(x + width/2, df['Test RMSE'], width, label='Test', color='salmon', edgecolor='black')
+        axes[1, 1].bar(x - width/2, top_models['Train RMSE'], width, 
+                      label='Train RMSE', color='skyblue', edgecolor='black')
+        axes[1, 1].bar(x + width/2, top_models['Test RMSE'], width,
+                      label='Test RMSE', color='lightcoral', edgecolor='black')
         axes[1, 1].set_xlabel('Model')
         axes[1, 1].set_ylabel('RMSE')
         axes[1, 1].set_title('Train vs Test RMSE')
         axes[1, 1].set_xticks(x)
-        axes[1, 1].set_xticklabels(df['Model'])
+        axes[1, 1].set_xticklabels(top_models['Model'], rotation=45, ha='right')
         axes[1, 1].legend()
-        axes[1, 1].grid(True, alpha=0.3, axis='y')
-        
-        # 6. Model Performance Summary
-        axes[1, 2].axis('off')
-        
-        # اضافه کردن متن خلاصه
-        best_model, best_rmse = self.get_best_model('Test RMSE')
-        best_r2_model, best_r2 = self.get_best_model('Test R2')
-        
-        summary_text = f"📊 خلاصه نتایج:\n\n"
-        summary_text += f"بهترین RMSE: {best_model}\n"
-        summary_text += f"   RMSE = {best_rmse:.2f}\n\n"
-        summary_text += f"بهترین R²: {best_r2_model}\n"
-        summary_text += f"   R² = {best_r2:.4f}\n\n"
-        
-        for _, row in df.iterrows():
-            summary_text += f"{row['Model']}:\n"
-            summary_text += f"   RMSE={row['Test RMSE']:.2f}, R²={row['Test R2']:.3f}\n"
-        
-        axes[1, 2].text(0.1, 0.9, summary_text, transform=axes[1, 2].transAxes,
-                       fontsize=10, verticalalignment='top',
-                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        axes[1, 1].grid(True, alpha=0.3)
         
         plt.suptitle('Baseline Models Comparison', fontsize=16, y=1.02)
         plt.tight_layout()
@@ -339,6 +329,27 @@ class BaselineModels:
         
         plt.show()
     
+    def plot_all_predictions(self, n_models=5, save_dir='plots/predictions'):
+        """
+        رسم نمودار پیش‌بینی برای چند مدل برتر
+        
+        پارامترها:
+        -----------
+        n_models : int
+            تعداد مدل‌های برتر
+        save_dir : str
+            پوشه ذخیره نمودارها
+        """
+        import os
+        os.makedirs(save_dir, exist_ok=True)
+        
+        df = pd.DataFrame(self.results)
+        top_models = df.nsmallest(n_models, 'Test RMSE')['Model'].tolist()
+        
+        for model_name in top_models:
+            save_path = os.path.join(save_dir, f'{model_name.replace(" ", "_")}_predictions.jpg')
+            self.plot_predictions(model_name, save_path)
+    
     def generate_report(self, save_path='reports/baseline_report.txt'):
         """
         ایجاد گزارش کامل از نتایج
@@ -357,9 +368,9 @@ class BaselineModels:
         best_r2_model, best_r2 = self.get_best_model('Test R2')
         
         report = []
-        report.append("="*70)
+        report.append("="*80)
         report.append("📊 گزارش کامل مدل‌های پایه")
-        report.append("="*70)
+        report.append("="*80)
         report.append(f"تاریخ: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
         report.append("")
         
@@ -377,21 +388,22 @@ class BaselineModels:
         report.append(f"   بهترین مدل بر اساس R²: {best_r2_model} (R²={best_r2:.4f})")
         report.append("")
         
-        # جدول نتایج
-        report.append("📊 نتایج کامل:")
+        # ۱۰ مدل برتر
+        report.append("📊 ۱۰ مدل برتر (بر اساس RMSE):")
         report.append("-" * 80)
-        for _, row in df.iterrows():
-            report.append(f"   {row['Model']:15s} | RMSE={row['Test RMSE']:8.2f} | R²={row['Test R2']:.4f} | MAE={row['Test MAE']:7.2f} | زمان={row['Time (s)']:.2f}s")
+        top10 = df.nsmallest(10, 'Test RMSE')[['Model', 'Test RMSE', 'Test R2', 'Test MAE', 'Time (s)']]
+        
+        for _, row in top10.iterrows():
+            report.append(f"   {row['Model']:25s} | RMSE={row['Test RMSE']:8.2f} | R²={row['Test R2']:.4f} | MAE={row['Test MAE']:7.2f} | زمان={row['Time (s)']:.2f}s")
         
         report.append("")
-        report.append("="*70)
+        report.append("="*80)
         report.append("✅ پایان گزارش")
-        report.append("="*70)
+        report.append("="*80)
         
         report_text = "\n".join(report)
         
         # ذخیره گزارش
-        import os
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         with open(save_path, 'w', encoding='utf-8') as f:
             f.write(report_text)
@@ -416,19 +428,55 @@ class BaselineModels:
         df = pd.DataFrame(self.results)
         df = df.sort_values('Test RMSE')
         
-        import os
         os.makedirs(os.path.dirname(path), exist_ok=True)
         df.to_csv(path, index=False, encoding='utf-8-sig')
         
         print(f"💾 نتایج در {path} ذخیره شد")
         
         return df
+    
+    def cross_validate_models(self, cv_folds=5):
+        """
+        انجام اعتبارسنجی متقاطع برای مدل‌های برتر
+        
+        پارامترها:
+        -----------
+        cv_folds : int
+            تعداد folds
+        """
+        from sklearn.model_selection import cross_val_score, KFold
+        
+        print(f"\n🔄 انجام اعتبارسنجی متقاطع با {cv_folds} folds...")
+        
+        df = pd.DataFrame(self.results)
+        top_models = df.nsmallest(5, 'Test RMSE')['Model'].tolist()
+        
+        cv_results = []
+        
+        for model_name in top_models:
+            model = self.models[model_name]
+            
+            # انجام cross-validation
+            cv = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
+            scores = cross_val_score(model, self.X_train, self.y_train, 
+                                    cv=cv, scoring='neg_mean_squared_error')
+            
+            rmse_scores = np.sqrt(-scores)
+            
+            cv_results.append({
+                'Model': model_name,
+                'Mean RMSE': rmse_scores.mean(),
+                'Std RMSE': rmse_scores.std(),
+                'Min RMSE': rmse_scores.min(),
+                'Max RMSE': rmse_scores.max()
+            })
+            
+            print(f"   {model_name}: RMSE = {rmse_scores.mean():.2f} ± {rmse_scores.std():.2f}")
+        
+        return pd.DataFrame(cv_results)
 
 
-# ============================================
 # تابع کمکی برای اجرای سریع
-# ============================================
-
 def run_baseline_quick(X_train, y_train, X_test, y_test):
     """
     اجرای سریع مدل‌های پایه
@@ -443,7 +491,7 @@ def run_baseline_quick(X_train, y_train, X_test, y_test):
     Returns:
     --------
     tuple
-        (نتایج, بهترین مدل, بهترین امتیاز)
+        (نتایج, بهترین مدل)
     """
     baseline = BaselineModels(X_train, y_train, X_test, y_test, X_test, y_test)
     baseline.define_models()
