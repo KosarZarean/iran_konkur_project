@@ -201,9 +201,6 @@ class ExamDataManager:
         # 2. استانداردسازی مقادیر دسته‌ای
         self._standardize_categorical()
         
-        # 3. حذف داده‌های پرت (اختیاری)
-        # self._remove_outliers()
-        
         print("✅ پاکسازی داده‌ها انجام شد")
     
     def _handle_missing_values(self):
@@ -252,26 +249,6 @@ class ExamDataManager:
         if 'شهر' in self.df.columns:
             self.df['شهر'] = self.df['شهر'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
             print(f"    شهر: {self.df['شهر'].nunique()} شهر یکتا")
-    
-    def _remove_outliers(self, threshold=3):
-        """حذف داده‌های پرت"""
-        print("  ⚠️ حذف داده‌های پرت...")
-        
-        for col in self.num_cols:
-            if col != 'رتبه کشوری':
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                
-                before = len(self.df)
-                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
-                after = len(self.df)
-                
-                if before > after:
-                    print(f"    {col}: {before - after} نمونه پرت حذف شد")
     
     def _define_task(self):
         """تعریف وظیفه یادگیری"""
@@ -513,7 +490,7 @@ class ExamDataManager:
     
     def _plot_numerical_features(self, save_dir):
         """رسم توزیع ویژگی‌های عددی"""
-        for col in self.num_cols[:6]:  # حداکثر ۶ ویژگی
+        for col in self.num_cols[:6]:
             plt.figure(figsize=(12, 4))
             
             plt.subplot(1, 2, 1)
@@ -533,10 +510,9 @@ class ExamDataManager:
     
     def _plot_categorical_features(self, save_dir):
         """رسم توزیع ویژگی‌های دسته‌ای"""
-        for col in self.cat_cols[:3]:  # حداکثر ۳ ویژگی
+        for col in self.cat_cols[:3]:
             plt.figure(figsize=(12, 6))
             
-            # ۱۵ دسته برتر
             value_counts = self.df[col].value_counts().head(15)
             
             plt.bar(range(len(value_counts)), value_counts.values, color='skyblue', edgecolor='black')
@@ -588,7 +564,6 @@ class ExamDataManager:
         return summary
 
 
-# کلاس کمکی برای تحلیل سریع
 class ExamDataAnalyzer:
     """
     کلاس تحلیل سریع داده‌ها
