@@ -3,6 +3,7 @@
 فقط شامل ۳ مدل: MLP، Random Forest و Gradient Boosting
 """
 
+import os  # ❗ این خط اضافه شد
 import time
 import numpy as np
 import pandas as pd
@@ -230,7 +231,10 @@ class BaselineModels:
         report.append("="*80)
         
         report_text = "\n".join(report)
+        
+        # ایجاد پوشه reports اگر وجود نداشت
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        
         with open(save_path, 'w', encoding='utf-8') as f:
             f.write(report_text)
         
@@ -244,7 +248,10 @@ class BaselineModels:
             return
         
         df = pd.DataFrame(self.results).sort_values('Test RMSE')
+        
+        # ایجاد پوشه results اگر وجود نداشت
         os.makedirs(os.path.dirname(path), exist_ok=True)
+        
         df.to_csv(path, index=False, encoding='utf-8-sig')
         
         print(f"💾 نتایج در {path} ذخیره شد")
