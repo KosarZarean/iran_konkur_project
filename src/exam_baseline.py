@@ -1,5 +1,5 @@
 """
-مدل‌های پایه و سنتی برای داده‌های کنکور ایران
+مدل‌های پایه برای داده‌های کنکور ایران
 شامل: رگرسیون خطی، درخت تصمیم، جنگل تصادفی، XGBoost، LightGBM، MLP و ...
 """
 
@@ -7,7 +7,6 @@ import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor
@@ -16,7 +15,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.neural_network import MLPRegressor
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
-from catboost import CatBoostRegressor
+# ❌ خط CatBoost حذف شد
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import warnings
 warnings.filterwarnings('ignore')
@@ -25,7 +24,7 @@ warnings.filterwarnings('ignore')
 class BaselineModels:
     """
     کلاس آموزش و ارزیابی مدل‌های پایه
-    شامل ۱۵ مدل مختلف رگرسیون
+    شامل ۱۴ مدل مختلف رگرسیون
     """
     
     def __init__(self, X_train, y_train, X_val, y_val, X_test, y_test, task_type='regression'):
@@ -69,7 +68,7 @@ class BaselineModels:
     
     def define_models(self):
         """
-        تعریف ۱۵ مدل پایه مختلف
+        تعریف ۱۴ مدل پایه مختلف (بدون CatBoost)
         """
         print("\n📋 تعریف مدل‌های پایه...")
         
@@ -100,8 +99,6 @@ class BaselineModels:
                                     subsample=0.8, colsample_bytree=0.8, random_state=42, verbosity=0),
             'LightGBM': LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1,
                                      num_leaves=31, random_state=42, verbose=-1),
-            'CatBoost': CatBoostRegressor(iterations=100, learning_rate=0.1, depth=6,
-                                         verbose=False, random_state=42),
             
             # 6. شبکه عصبی
             'MLP': MLPRegressor(hidden_layer_sizes=(128, 64, 32), activation='relu',
@@ -174,13 +171,14 @@ class BaselineModels:
                 
             except Exception as e:
                 if verbose:
-                    print(f"   ❌ خطا: {e}")
+                    print(f"   ❌ خطا در آموزش {name}: {e}")
         
         # ایجاد DataFrame نتایج
         results_df = pd.DataFrame(self.results)
         
         # مرتب‌سازی بر اساس RMSE
-        results_df = results_df.sort_values('Test RMSE')
+        if not results_df.empty:
+            results_df = results_df.sort_values('Test RMSE')
         
         print("\n" + "="*80)
         print("✅ آموزش همه مدل‌ها کامل شد")
@@ -286,70 +284,6 @@ class BaselineModels:
         
         print(f"📊 نمودار در {save_path} ذخیره شد")
     
-    def plot_predictions(self, model_name, save_path=None):
-        """
-        رسم نمودار پیش‌بینی برای یک مدل خاص
-        
-        پارامترها:
-        -----------
-        model_name : str
-            نام مدل
-        save_path : str
-            مسیر ذخیره نمودار
-        """
-        if model_name not in self.predictions:
-            print(f"❌ مدل {model_name} یافت نشد")
-            return
-        
-        y_pred = self.predictions[model_name]
-        
-        fig, axes = plt.subplots(1, 2, figsize=(15, 5))
-        
-        # Scatter plot
-        axes[0].scatter(self.y_test, y_pred, alpha=0.5, s=10)
-        axes[0].plot([self.y_test.min(), self.y_test.max()], 
-                    [self.y_test.min(), self.y_test.max()], 'r--', lw=2)
-        axes[0].set_xlabel('Actual Values')
-        axes[0].set_ylabel('Predicted Values')
-        axes[0].set_title(f'{model_name}: Actual vs Predicted')
-        axes[0].grid(True, alpha=0.3)
-        
-        # Residuals
-        residuals = self.y_test - y_pred
-        axes[1].hist(residuals, bins=50, edgecolor='black', alpha=0.7)
-        axes[1].set_xlabel('Residuals')
-        axes[1].set_ylabel('Frequency')
-        axes[1].set_title(f'{model_name}: Residual Distribution')
-        axes[1].grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        
-        plt.show()
-    
-    def plot_all_predictions(self, n_models=5, save_dir='plots/predictions'):
-        """
-        رسم نمودار پیش‌بینی برای چند مدل برتر
-        
-        پارامترها:
-        -----------
-        n_models : int
-            تعداد مدل‌های برتر
-        save_dir : str
-            پوشه ذخیره نمودارها
-        """
-        import os
-        os.makedirs(save_dir, exist_ok=True)
-        
-        df = pd.DataFrame(self.results)
-        top_models = df.nsmallest(n_models, 'Test RMSE')['Model'].tolist()
-        
-        for model_name in top_models:
-            save_path = os.path.join(save_dir, f'{model_name.replace(" ", "_")}_predictions.jpg')
-            self.plot_predictions(model_name, save_path)
-    
     def generate_report(self, save_path='reports/baseline_report.txt'):
         """
         ایجاد گزارش کامل از نتایج
@@ -434,89 +368,3 @@ class BaselineModels:
         print(f"💾 نتایج در {path} ذخیره شد")
         
         return df
-    
-    def cross_validate_models(self, cv_folds=5):
-        """
-        انجام اعتبارسنجی متقاطع برای مدل‌های برتر
-        
-        پارامترها:
-        -----------
-        cv_folds : int
-            تعداد folds
-        """
-        from sklearn.model_selection import cross_val_score, KFold
-        
-        print(f"\n🔄 انجام اعتبارسنجی متقاطع با {cv_folds} folds...")
-        
-        df = pd.DataFrame(self.results)
-        top_models = df.nsmallest(5, 'Test RMSE')['Model'].tolist()
-        
-        cv_results = []
-        
-        for model_name in top_models:
-            model = self.models[model_name]
-            
-            # انجام cross-validation
-            cv = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
-            scores = cross_val_score(model, self.X_train, self.y_train, 
-                                    cv=cv, scoring='neg_mean_squared_error')
-            
-            rmse_scores = np.sqrt(-scores)
-            
-            cv_results.append({
-                'Model': model_name,
-                'Mean RMSE': rmse_scores.mean(),
-                'Std RMSE': rmse_scores.std(),
-                'Min RMSE': rmse_scores.min(),
-                'Max RMSE': rmse_scores.max()
-            })
-            
-            print(f"   {model_name}: RMSE = {rmse_scores.mean():.2f} ± {rmse_scores.std():.2f}")
-        
-        return pd.DataFrame(cv_results)
-
-
-# تابع کمکی برای اجرای سریع
-def run_baseline_quick(X_train, y_train, X_test, y_test):
-    """
-    اجرای سریع مدل‌های پایه
-    
-    پارامترها:
-    -----------
-    X_train, y_train : array
-        داده آموزش
-    X_test, y_test : array
-        داده آزمایش
-    
-    Returns:
-    --------
-    tuple
-        (نتایج, بهترین مدل)
-    """
-    baseline = BaselineModels(X_train, y_train, X_test, y_test, X_test, y_test)
-    baseline.define_models()
-    results = baseline.train_and_evaluate(verbose=False)
-    best_model, best_score = baseline.get_best_model()
-    
-    return results, best_model, best_score
-
-
-if __name__ == "__main__":
-    # تست سریع
-    print("🧪 تست کلاس BaselineModels")
-    
-    # ایجاد داده نمونه
-    from sklearn.datasets import make_regression
-    X, y = make_regression(n_samples=1000, n_features=10, noise=0.1, random_state=42)
-    
-    # تقسیم داده
-    from sklearn.model_selection import train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
-    
-    # اجرا
-    baseline = BaselineModels(X_train, y_train, X_val, y_val, X_test, y_test)
-    baseline.define_models()
-    results = baseline.train_and_evaluate()
-    baseline.plot_comparison()
-    baseline.generate_report()
