@@ -60,7 +60,7 @@ def run_stage2(data_path='data/iran_exam.csv'):
     print(f"   اعتبارسنجی: {len(val_idx)} نمونه ({len(val_idx)/n*100:.1f}%)")
     print(f"   آزمایش: {len(test_idx)} نمونه ({len(test_idx)/n*100:.1f}%)")
     
-    # ۴. ساخت مدل - ✅ پارامتر dropout را حذف کردیم
+    # ۴. ساخت مدل
     print("\n🏗️ مرحله ۲-۴: ساخت مدل TabTransformer...")
     model = TabTransformer(
         num_categorical=X_cat.shape[1],
@@ -70,8 +70,6 @@ def run_stage2(data_path='data/iran_exam.csv'):
         num_heads=4,
         num_layers=3,
         mlp_hidden_dims=[128, 64],
-        # ❌ پارامتر dropout حذف شد
-        # ✅ از مقادیر پیش‌فرض transformer_dropout=0.1 و mlp_dropout=0.2 استفاده می‌شود
         output_dim=1
     )
     
@@ -87,7 +85,7 @@ def run_stage2(data_path='data/iran_exam.csv'):
         save_dir='models/stage2'
     )
     
-    # ۶. ایجاد DataLoader
+    # ۶. ایجاد DataLoader - ✅ با اضافه کردن پارامترهای مورد نیاز
     print("\n📦 مرحله ۲-۶: ایجاد DataLoader...")
     trainer.create_dataloaders(
         # داده‌های دسته‌ای و عددی برای آموزش
@@ -99,6 +97,12 @@ def run_stage2(data_path='data/iran_exam.csv'):
         X_cat_val=X_cat[val_idx],
         X_cont_val=X_cont[val_idx],
         y_val=y[val_idx],
+        
+        # ⚠️ اضافه کردن پارامترهای اضافی با مقدار None
+        X_train=None,
+        X_val=None,
+        y_train_mlp=None,
+        y_val_mlp=None,
         
         # اندازه batch
         batch_size=64
