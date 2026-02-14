@@ -194,6 +194,7 @@ class TabTransformerWithNumEmbedding(nn.Module):
         self.num_categorical = num_categorical
         self.num_continuous = num_continuous
         self.num_embedding_type = num_embedding_type
+        self.embedding_dim = embedding_dim
         
         # Embedding برای ویژگی‌های دسته‌ای
         self.cat_embeddings = nn.ModuleList([
@@ -227,24 +228,32 @@ class TabTransformerWithNumEmbedding(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers)
         
+        # محاسبه بعد خروجی Transformer
+        # هر ویژگی دسته‌ای یک embedding به اندازه embedding_dim دارد
+        # هر ویژگی عددی یک embedding به اندازه embedding_dim دارد (بعد از جاسازی)
+        transformer_output_dim = embedding_dim * (num_categorical + num_continuous)
+        print(f"📐 بعد خروجی Transformer: {transformer_output_dim}")
+        
         # MLP نهایی
-        total_embeddings = num_categorical + num_continuous
-        mlp_input_dim = embedding_dim * total_embeddings
-        
         mlp_layers = []
-        prev_dim = mlp_input_dim
+        prev_dim = transformer_output_dim
         
-        for hidden_dim in mlp_hidden_dims:
-            mlp_layers.extend([
-                nn.Linear(prev_dim, hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(mlp_dropout)
-            ])
+        for i, hidden_dim in enumerate(mlp_hidden_dims):
+            mlp_layers.append(nn.Linear(prev_dim, hidden_dim))
+            mlp_layers.append(nn.ReLU())
+            mlp_layers.append(nn.Dropout(mlp_dropout))
             prev_dim = hidden_dim
+            print(f"   لایه {i+1}: {prev_dim} -> {hidden_dim}")
         
         mlp_layers.append(nn.Linear(prev_dim, output_dim))
+        print(f"   لایه خروجی: {prev_dim} -> {output_dim}")
         
         self.mlp = nn.Sequential(*mlp_layers)
+        
+        print(f"✅ مدل TabTransformerWithNumEmbedding ساخته شد")
+        print(f"   ویژگی‌های دسته‌ای: {num_categorical}, ویژگی‌های عددی: {num_continuous}")
+        print(f"   ابعاد embedding: {embedding_dim}")
+        print(f"   بعد کل: {transformer_output_dim}")
     
     def forward(self, x_cat, x_cont):
         batch_size = x_cat.shape[0]
@@ -255,23 +264,33 @@ class TabTransformerWithNumEmbedding(nn.Module):
             emb = self.cat_embeddings[i](x_cat[:, i])
             cat_embedded.append(emb)
         
-        cat_embedded = torch.stack(cat_embedded, dim=1)
+        cat_embedded = torch.stack(cat_embedded, dim=1)  # (batch, num_cat, emb_dim)
         
         # جاسازی ویژگی‌های عددی
         if self.num_continuous > 0:
             if hasattr(self, 'num_embedding'):
-                num_embedded = self.num_embedding(x_cont)
+                # روش‌های جاسازی پیشرفته
+                num_embedded = self.num_embedding(x_cont)  # (batch, num_cont, emb_dim)
             else:
-                num_embedded = self.num_proj(x_cont).unsqueeze(1)
+                # projection ساده
+                num_embedded = self.num_proj(x_cont).unsqueeze(1)  # (batch, 1, emb_dim)
+                # اگر num_continuous > 1، باید تکرار شود
+                if self.num_continuous > 1:
+                    num_embedded = num_embedded.repeat(1, self.num_continuous, 1)
         else:
-            num_embedded = torch.empty(batch_size, 0, cat_embedded.size(2)).to(x_cat.device)
+            num_embedded = torch.empty(batch_size, 0, self.embedding_dim).to(x_cat.device)
         
         # ترکیب همه embeddings
         all_embeddings = torch.cat([cat_embedded, num_embedded], dim=1)
+        # all_embeddings shape: (batch, num_cat + num_cont, emb_dim)
         
         # عبور از Transformer
         transformed = self.transformer(all_embeddings)
+        # transformed shape: (batch, num_cat + num_cont, emb_dim)
+        
+        # Flatten کردن
         flattened = transformed.reshape(batch_size, -1)
+        # flattened shape: (batch, (num_cat + num_cont) * emb_dim)
         
         # MLP نهایی
         output = self.mlp(flattened)
