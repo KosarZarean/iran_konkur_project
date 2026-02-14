@@ -60,7 +60,7 @@ def run_stage2(data_path='data/iran_exam.csv'):
     print(f"   اعتبارسنجی: {len(val_idx)} نمونه ({len(val_idx)/n*100:.1f}%)")
     print(f"   آزمایش: {len(test_idx)} نمونه ({len(test_idx)/n*100:.1f}%)")
     
-    # ۴. ساخت مدل
+    # ۴. ساخت مدل - ✅ پارامتر dropout را حذف کردیم
     print("\n🏗️ مرحله ۲-۴: ساخت مدل TabTransformer...")
     model = TabTransformer(
         num_categorical=X_cat.shape[1],
@@ -70,7 +70,8 @@ def run_stage2(data_path='data/iran_exam.csv'):
         num_heads=4,
         num_layers=3,
         mlp_hidden_dims=[128, 64],
-        dropout=0.2,
+        # ❌ پارامتر dropout حذف شد
+        # ✅ از مقادیر پیش‌فرض transformer_dropout=0.1 و mlp_dropout=0.2 استفاده می‌شود
         output_dim=1
     )
     
@@ -86,7 +87,7 @@ def run_stage2(data_path='data/iran_exam.csv'):
         save_dir='models/stage2'
     )
     
-    # ۶. ایجاد DataLoader - ✅ اینجا مشکل قبلی را حل کردیم
+    # ۶. ایجاد DataLoader
     print("\n📦 مرحله ۲-۶: ایجاد DataLoader...")
     trainer.create_dataloaders(
         # داده‌های دسته‌ای و عددی برای آموزش
@@ -136,8 +137,7 @@ def run_stage2(data_path='data/iran_exam.csv'):
             'embedding_dim': 32,
             'num_heads': 4,
             'num_layers': 3,
-            'mlp_hidden_dims': [128, 64],
-            'dropout': 0.2
+            'mlp_hidden_dims': [128, 64]
         },
         'results': results,
         'history': trainer.history
@@ -192,12 +192,13 @@ def generate_report(results, trainer, data_manager, total_params):
     report.append("")
     
     # نتایج آموزش
-    report.append("📈 تاریخچه آموزش:")
-    report.append(f"  - بهترین Loss آموزش: {min(trainer.history['train_loss']):.4f}")
-    report.append(f"  - بهترین Loss اعتبارسنجی: {min(trainer.history['val_loss']):.4f}")
-    report.append(f"  - بهترین RMSE آموزش: {min(trainer.history['train_rmse']):.2f}")
-    report.append(f"  - بهترین RMSE اعتبارسنجی: {min(trainer.history['val_rmse']):.2f}")
-    report.append("")
+    if trainer.history and len(trainer.history['train_loss']) > 0:
+        report.append("📈 تاریخچه آموزش:")
+        report.append(f"  - بهترین Loss آموزش: {min(trainer.history['train_loss']):.4f}")
+        report.append(f"  - بهترین Loss اعتبارسنجی: {min(trainer.history['val_loss']):.4f}")
+        report.append(f"  - بهترین RMSE آموزش: {min(trainer.history['train_rmse']):.2f}")
+        report.append(f"  - بهترین RMSE اعتبارسنجی: {min(trainer.history['val_rmse']):.2f}")
+        report.append("")
     
     # نتایج نهایی
     report.append("🎯 نتایج نهایی:")
