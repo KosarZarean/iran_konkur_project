@@ -87,26 +87,26 @@ def run_stage2(data_path='data/iran_exam.csv'):
     
     # ۶. ایجاد DataLoader - ✅ با اضافه کردن پارامترهای مورد نیاز
     print("\n📦 مرحله ۲-۶: ایجاد DataLoader...")
-    trainer.create_dataloaders(
-        # داده‌های دسته‌ای و عددی برای آموزش
-        X_cat_train=X_cat[train_idx],
-        X_cont_train=X_cont[train_idx],
-        y_train=y[train_idx],
-        
-        # داده‌های دسته‌ای و عددی برای اعتبارسنجی
-        X_cat_val=X_cat[val_idx],
-        X_cont_val=X_cont[val_idx],
-        y_val=y[val_idx],
-        
-        # ⚠️ اضافه کردن پارامترهای اضافی با مقدار None
-        X_train=None,
-        X_val=None,
-        y_train_mlp=None,
-        y_val_mlp=None,
-        
-        # اندازه batch
-        batch_size=64
-    )
+trainer.create_dataloaders(
+    # داده‌های دسته‌ای و عددی برای آموزش
+    X_cat_train=X_cat[train_idx],
+    X_cont_train=X_cont[train_idx],
+    y_train=y[train_idx],
+    
+    # داده‌های دسته‌ای و عددی برای اعتبارسنجی
+    X_cat_val=X_cat[val_idx],
+    X_cont_val=X_cont[val_idx],
+    y_val=y[val_idx],
+    
+    # پارامترهای مربوط به MLP (با None)
+    X_train=None,
+    X_val=None,
+    y_train_mlp=None,
+    y_val_mlp=None,
+    
+    # اندازه batch
+    batch_size=64
+)
     
     # ۷. آموزش مدل
     print("\n🚀 مرحله ۲-۷: آموزش مدل...")
