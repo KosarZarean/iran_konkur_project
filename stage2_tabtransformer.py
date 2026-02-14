@@ -24,7 +24,7 @@ def run_stage2(data_path='data/iran_exam.csv'):
     اجرای مرحله ۲ و ذخیره نتایج
     """
     print("\n" + "="*70)
-    print("🎯 مرحله ۲: TabTransformer")
+    print("🎯 مرحله ۲: مدل TabTransformer")
     print("="*70)
     print(f"📅 زمان شروع: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70)
@@ -35,10 +35,15 @@ def run_stage2(data_path='data/iran_exam.csv'):
     os.makedirs('models/stage2', exist_ok=True)
     os.makedirs('reports', exist_ok=True)
 
-    # ۱. بارگذاری داده
+    # ۱. بارگذاری داده با استفاده از ExamDataManager (✅ اصلاح شده)
     print("\n📊 مرحله ۲-۱: بارگذاری داده‌ها...")
     data_manager = ExamDataManager()
     df = data_manager.load_and_prepare_data(data_path, 'regression')
+    
+    # نمایش اطلاعات داده
+    print(f"\n📋 اطلاعات داده:")
+    print(f"   تعداد نمونه‌ها: {len(df)}")
+    print(f"   ستون‌ها: {df.columns.tolist()}")
 
     # ۲. آماده‌سازی برای TabTransformer
     print("\n🔄 مرحله ۲-۲: آماده‌سازی داده برای TabTransformer...")
@@ -174,9 +179,7 @@ def run_stage2(data_path='data/iran_exam.csv'):
 
 
 def generate_report(results, trainer, data_manager, total_params):
-    """
-    ایجاد گزارش مرحله ۲
-    """
+    """ایجاد گزارش مرحله ۲"""
     report = []
     report.append("="*70)
     report.append("📊 گزارش مرحله ۲: پیاده‌سازی TabTransformer")
