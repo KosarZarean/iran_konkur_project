@@ -78,7 +78,7 @@ def run_stage3(data_path='data/iran_exam.csv'):
     for method in methods:
         print(f"\n📌 روش: {method_names[method]}")
 
-        # ساخت مدل با جاسازی عددی
+        # ✅ ساخت مدل با جاسازی عددی - بدون پارامتر dropout
         model = TabTransformerWithNumEmbedding(
             num_categorical=X_cat.shape[1],
             num_continuous=X_cont.shape[1],
@@ -88,7 +88,8 @@ def run_stage3(data_path='data/iran_exam.csv'):
             num_heads=4,
             num_layers=3,
             mlp_hidden_dims=[128, 64],
-            dropout=0.2,
+            # ❌ پارامتر dropout حذف شد
+            # از مقادیر پیش‌فرض transformer_dropout=0.1 و mlp_dropout=0.2 استفاده می‌شود
             output_dim=1
         )
 
@@ -175,7 +176,7 @@ def run_stage3(data_path='data/iran_exam.csv'):
 
     # ۶. رسم نمودار مقایسه
     print("\n📈 مرحله ۳-۶: رسم نمودار مقایسه...")
-    plot_comparison(results_list, method_names)
+    plot_comparison(results_list)
 
     # ۷. ایجاد گزارش
     print("\n📝 مرحله ۳-۷: ایجاد گزارش...")
@@ -192,7 +193,7 @@ def run_stage3(data_path='data/iran_exam.csv'):
     return results_list, report
 
 
-def plot_comparison(results_list, method_names):
+def plot_comparison(results_list):
     """رسم نمودار مقایسه روش‌های جاسازی"""
     fig, axes = plt.subplots(1, 2, figsize=(15, 6))
 
@@ -200,31 +201,32 @@ def plot_comparison(results_list, method_names):
     rmse_values = [r['rmse'] for r in results_list]
     r2_values = [r['r2'] for r in results_list]
 
-    colors = ['skyblue', 'lightgreen', 'salmon']
+    # نقشه رنگ برای روش‌ها
+    colors = ['#3498db', '#2ecc71', '#e74c3c']  # آبی، سبز، قرمز
 
     # نمودار RMSE
-    bars1 = axes[0].bar(methods, rmse_values, color=colors, edgecolor='black')
-    axes[0].set_xlabel('Embedding Method')
-    axes[0].set_ylabel('RMSE (lower is better)')
-    axes[0].set_title('RMSE Comparison')
+    bars1 = axes[0].bar(methods, rmse_values, color=colors, edgecolor='black', alpha=0.8)
+    axes[0].set_xlabel('Embedding Method', fontsize=12)
+    axes[0].set_ylabel('RMSE (lower is better)', fontsize=12)
+    axes[0].set_title('RMSE Comparison of Numerical Embeddings', fontsize=14)
     axes[0].grid(True, alpha=0.3, axis='y')
 
     for bar, val in zip(bars1, rmse_values):
         axes[0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
-                    f'{val:.2f}', ha='center', va='bottom')
+                    f'{val:.2f}', ha='center', va='bottom', fontsize=10)
 
     # نمودار R²
-    bars2 = axes[1].bar(methods, r2_values, color=colors, edgecolor='black')
-    axes[1].set_xlabel('Embedding Method')
-    axes[1].set_ylabel('R² (higher is better)')
-    axes[1].set_title('R² Comparison')
+    bars2 = axes[1].bar(methods, r2_values, color=colors, edgecolor='black', alpha=0.8)
+    axes[1].set_xlabel('Embedding Method', fontsize=12)
+    axes[1].set_ylabel('R² (higher is better)', fontsize=12)
+    axes[1].set_title('R² Comparison of Numerical Embeddings', fontsize=14)
     axes[1].grid(True, alpha=0.3, axis='y')
 
     for bar, val in zip(bars2, r2_values):
         axes[1].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
-                    f'{val:.4f}', ha='center', va='bottom')
+                    f'{val:.4f}', ha='center', va='bottom', fontsize=10)
 
-    plt.suptitle('Numerical Embeddings Comparison', fontsize=14, y=1.02)
+    plt.suptitle('Numerical Embeddings Performance Comparison', fontsize=16, y=1.02)
     plt.tight_layout()
     plt.savefig('plots/stage3/embeddings_comparison.jpg', dpi=300, bbox_inches='tight')
     plt.show()
@@ -241,13 +243,14 @@ def generate_report(results_list, data_manager):
 
     # اطلاعات داده
     report.append("📋 اطلاعات داده:")
-    report.append(f"  - تعداد کل نمونه‌ها: {len(data_manager.df)}")
+    report.append(f"  - تعداد کل نمونه‌ها: {len(data_manager.df):,}")
     report.append(f"  - تعداد ویژگی‌های عددی: {data_manager.X_cont.shape[1] if hasattr(data_manager, 'X_cont') else 0}")
+    report.append(f"  - تعداد ویژگی‌های دسته‌ای: {data_manager.X_cat.shape[1] if hasattr(data_manager, 'X_cat') else 0}")
     report.append("")
 
     # نتایج روش‌های مختلف
     report.append("📊 مقایسه روش‌های جاسازی عددی:")
-    report.append("-" * 60)
+    report.append("-" * 70)
 
     best_method = None
     best_rmse = float('inf')
@@ -264,7 +267,7 @@ def generate_report(results_list, data_manager):
             best_method = r
 
     report.append("")
-    report.append("-" * 60)
+    report.append("-" * 70)
 
     # بهترین روش
     if best_method:
