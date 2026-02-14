@@ -22,21 +22,26 @@ def print_menu():
 
 
 def run_stage1():
+    print("\n🚀 اجرای مرحله ۱...")
     import stage1_baseline
     return stage1_baseline.run_stage1()
 
 
 def run_stage2():
+    print("\n🚀 اجرای مرحله ۲...")
     import stage2_tabtransformer
-    return stage2_tabtransformer.run_stage2()
+    results, trainer, report = stage2_tabtransformer.run_stage2()
+    return results
 
 
 def run_stage3():
+    print("\n🚀 اجرای مرحله ۳...")
     import stage3_numerical_embeddings
     return stage3_numerical_embeddings.run_stage3()
 
 
 def run_stage4():
+    print("\n🚀 اجرای مرحله ۴...")
     import stage4_final_analysis
     return stage4_final_analysis.run_stage4()
 
@@ -47,6 +52,7 @@ def run_all():
     run_stage2()
     run_stage3()
     run_stage4()
+    print("\n✅ همه مراحل با موفقیت اجرا شدند!")
 
 
 def main():
