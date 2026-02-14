@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
-from exam_models import ExamDataset, TabTransformerDataset, EarlyStopping, ModelUtils
+from exam_models import ExamDataset, TabTransformerDataset, EarlyStopping
 
 
 class ExamTrainer:
@@ -46,7 +46,7 @@ class ExamTrainer:
         
         # تعیین دستگاه
         if device is None:
-            self.device = ModelUtils.get_device()
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = device
         
@@ -77,25 +77,26 @@ class ExamTrainer:
         print(f"✅ Trainer ایجاد شد:")
         print(f"   مدل: {model_type}")
         print(f"   دستگاه: {self.device}")
-        print(f"   تعداد پارامترها: {ModelUtils.count_parameters(model)['total']:,}")
     
-    def create_dataloaders(self, X_train, y_train, X_val, y_val,
-                          X_cat_train=None, X_cont_train=None,
-                          X_cat_val=None, X_cont_val=None,
+    def create_dataloaders(self, 
+                          X_cat_train=None, X_cont_train=None, y_train=None,
+                          X_cat_val=None, X_cont_val=None, y_val=None,
+                          X_train=None, y_train_mlp=None, 
+                          X_val=None, y_val_mlp=None,
                           batch_size=64, num_workers=2):
         """
         ایجاد DataLoader برای آموزش و اعتبارسنجی
         
         پارامترها:
         -----------
-        X_train, y_train : array
-            داده آموزش
-        X_val, y_val : array
-            داده اعتبارسنجی
-        X_cat_train, X_cont_train : array
-            داده دسته‌ای و عددی برای TabTransformer
-        X_cat_val, X_cont_val : array
-            داده اعتبارسنجی برای TabTransformer
+        X_cat_train, X_cont_train, y_train : array
+            داده دسته‌ای و عددی برای TabTransformer (آموزش)
+        X_cat_val, X_cont_val, y_val : array
+            داده دسته‌ای و عددی برای TabTransformer (اعتبارسنجی)
+        X_train, y_train_mlp : array
+            داده برای MLP (آموزش)
+        X_val, y_val_mlp : array
+            داده برای MLP (اعتبارسنجی)
         batch_size : int
             اندازه batch
         num_workers : int
@@ -104,6 +105,10 @@ class ExamTrainer:
         print("\n📦 ایجاد DataLoader...")
         
         if self.model_type == 'tabtransformer':
+            # بررسی وجود داده برای TabTransformer
+            if X_cat_train is None or X_cont_train is None or y_train is None:
+                raise ValueError("برای TabTransformer باید X_cat_train, X_cont_train و y_train مشخص شوند")
+            
             # Dataset برای TabTransformer
             train_dataset = TabTransformerDataset(
                 X_cat_train, X_cont_train, y_train
@@ -111,10 +116,17 @@ class ExamTrainer:
             val_dataset = TabTransformerDataset(
                 X_cat_val, X_cont_val, y_val
             )
+            print(f"   📊 TabTransformer: categorical={X_cat_train.shape[1]}, continuous={X_cont_train.shape[1]}")
+            
         else:
+            # بررسی وجود داده برای MLP
+            if X_train is None or y_train_mlp is None:
+                raise ValueError("برای MLP باید X_train و y_train_mlp مشخص شوند")
+            
             # Dataset برای مدل‌های معمولی
-            train_dataset = ExamDataset(X_train, y_train)
-            val_dataset = ExamDataset(X_val, y_val)
+            train_dataset = ExamDataset(X_train, y_train_mlp)
+            val_dataset = ExamDataset(X_val, y_val_mlp)
+            print(f"   📊 MLP: features={X_train.shape[1]}")
         
         # DataLoader
         self.train_loader = DataLoader(
@@ -169,8 +181,8 @@ class ExamTrainer:
             # پس‌رو و بهینه‌سازی
             loss.backward()
             
-            # Gradient clipping
-            if self.clip_grad_norm:
+            # Gradient clipping (اختیاری)
+            if hasattr(self, 'clip_grad_norm') and self.clip_grad_norm:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad_norm)
             
             self.optimizer.step()
@@ -232,7 +244,7 @@ class ExamTrainer:
         
         return avg_loss, rmse, mae, r2
     
-    def train(self, epochs=100, lr=0.001, weight_decay=1e-5,
+    def train(self, epochs=100, lr=0.001, weight_decay=1e-5, task_type='regression',
              patience=15, min_delta=0.001, clip_grad_norm=None,
              scheduler=None, verbose=True):
         """
@@ -246,6 +258,8 @@ class ExamTrainer:
             نرخ یادگیری
         weight_decay : float
             تنظیم L2
+        task_type : str
+            نوع وظیفه ('regression' یا 'classification')
         patience : int
             تعداد دوره‌های تحمل برای early stopping
         min_delta : float
@@ -263,7 +277,7 @@ class ExamTrainer:
         
         # تنظیمات
         self.clip_grad_norm = clip_grad_norm
-        self.criterion = nn.MSELoss()
+        self.criterion = nn.MSELoss()  # برای رگرسیون
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(), 
             lr=lr, 
@@ -271,6 +285,7 @@ class ExamTrainer:
         )
         
         # Early stopping
+        from exam_models import EarlyStopping
         early_stopping = EarlyStopping(
             patience=patience,
             min_delta=min_delta,
@@ -318,10 +333,10 @@ class ExamTrainer:
             early_stopping(-val_rmse, self.model, epoch)
             
             # نمایش پیشرفت
-            if verbose and (epoch % 10 == 0 or epoch == 1):
+            if verbose and (epoch % 10 == 0 or epoch == 1 or early_stopping.early_stop):
                 print(f"\n📊 Epoch {epoch}/{epochs}")
-                print(f"   Train - Loss: {train_loss:.4f}, RMSE: {train_rmse:.2f}, MAE: {train_mae:.2f}, R²: {train_r2:.4f}")
-                print(f"   Val   - Loss: {val_loss:.4f}, RMSE: {val_rmse:.2f}, MAE: {val_mae:.2f}, R²: {val_r2:.4f}")
+                print(f"   Train - Loss: {train_loss:.4f}, RMSE: {train_rmse:.2f}, R²: {train_r2:.4f}")
+                print(f"   Val   - Loss: {val_loss:.4f}, RMSE: {val_rmse:.2f}, R²: {val_r2:.4f}")
                 print(f"   زمان: {epoch_time:.2f}s, LR: {self.optimizer.param_groups[0]['lr']:.6f}")
             
             if early_stopping.early_stop:
@@ -339,16 +354,19 @@ class ExamTrainer:
         print(f"\n⏱️  زمان کل آموزش: {total_time:.2f} ثانیه ({total_time/60:.2f} دقیقه)")
         print("="*80)
     
-    def evaluate(self, X_test, y_test, X_cat_test=None, X_cont_test=None, batch_size=64):
+    def evaluate(self, 
+                X_cat_test=None, X_cont_test=None, y_test=None,
+                X_test=None, y_test_mlp=None,
+                batch_size=64):
         """
         ارزیابی مدل روی داده آزمایش
         
         پارامترها:
         -----------
-        X_test, y_test : array
-            داده آزمایش
-        X_cat_test, X_cont_test : array
+        X_cat_test, X_cont_test, y_test : array
             داده دسته‌ای و عددی برای TabTransformer
+        X_test, y_test_mlp : array
+            داده برای MLP
         batch_size : int
             اندازه batch
         
@@ -363,9 +381,15 @@ class ExamTrainer:
         
         # ایجاد DataLoader
         if self.model_type == 'tabtransformer':
+            if X_cat_test is None or X_cont_test is None or y_test is None:
+                raise ValueError("برای TabTransformer باید X_cat_test, X_cont_test و y_test مشخص شوند")
+            
             test_dataset = TabTransformerDataset(X_cat_test, X_cont_test, y_test)
         else:
-            test_dataset = ExamDataset(X_test, y_test)
+            if X_test is None or y_test_mlp is None:
+                raise ValueError("برای MLP باید X_test و y_test_mlp مشخص شوند")
+            
+            test_dataset = ExamDataset(X_test, y_test_mlp)
         
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
         
@@ -407,16 +431,19 @@ class ExamTrainer:
         
         return results
     
-    def predict(self, X, X_cat=None, X_cont=None, batch_size=64):
+    def predict(self, 
+               X_cat=None, X_cont=None,
+               X=None,
+               batch_size=64):
         """
         پیش‌بینی با مدل
         
         پارامترها:
         -----------
-        X : array
-            ویژگی‌ها
         X_cat, X_cont : array
             ویژگی‌های دسته‌ای و عددی برای TabTransformer
+        X : array
+            ویژگی‌ها برای MLP
         batch_size : int
             اندازه batch
         
@@ -428,8 +455,14 @@ class ExamTrainer:
         self.model.eval()
         
         if self.model_type == 'tabtransformer':
+            if X_cat is None or X_cont is None:
+                raise ValueError("برای TabTransformer باید X_cat و X_cont مشخص شوند")
+            
             dataset = TabTransformerDataset(X_cat, X_cont, np.zeros(len(X_cat)))
         else:
+            if X is None:
+                raise ValueError("برای MLP باید X مشخص شود")
+            
             dataset = ExamDataset(X, np.zeros(len(X)))
         
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
@@ -574,135 +607,3 @@ class ExamTrainer:
         
         print(f"📂 مدل از {path} بارگذاری شد")
         print(f"   بهترین RMSE: {self.best_val_rmse:.2f} (epoch {self.best_epoch})")
-
-
-# ============================================
-# کلاس‌های کمکی برای آموزش
-# ============================================
-
-class LRFinder:
-    """
-    پیدا کردن نرخ یادگیری بهینه با افزایش تدریجی
-    """
-    def __init__(self, model, trainer, device='cuda'):
-        self.model = model
-        self.trainer = trainer
-        self.device = device
-    
-    def range_test(self, train_loader, start_lr=1e-7, end_lr=10, num_iter=100, beta=0.98):
-        """
-        تست محدوده نرخ یادگیری
-        
-        پارامترها:
-        -----------
-        train_loader : DataLoader
-            داده آموزش
-        start_lr : float
-            نرخ یادگیری شروع
-        end_lr : float
-            نرخ یادگیری پایان
-        num_iter : int
-            تعداد تکرار
-        beta : float
-            پارامتر smoothing
-        """
-        lrs = []
-        losses = []
-        best_loss = None
-        lr_mult = (end_lr / start_lr) ** (1 / num_iter)
-        
-        self.model.train()
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=start_lr)
-        criterion = nn.MSELoss()
-        
-        for batch_idx, batch in enumerate(train_loader):
-            if batch_idx >= num_iter:
-                break
-            
-            # تنظیم نرخ یادگیری
-            lr = start_lr * (lr_mult ** batch_idx)
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = lr
-            
-            # یک step
-            optimizer.zero_grad()
-            
-            if self.trainer.model_type == 'tabtransformer':
-                x_cat, x_cont, y = batch
-                x_cat = x_cat.to(self.device)
-                x_cont = x_cont.to(self.device)
-                y = y.to(self.device)
-                output = self.model(x_cat, x_cont)
-            else:
-                x, y = batch
-                x = x.to(self.device)
-                y = y.to(self.device)
-                output = self.model(x)
-            
-            loss = criterion(output, y)
-            
-            # Smoothing
-            if best_loss is None:
-                best_loss = loss.item()
-            else:
-                best_loss = beta * best_loss + (1 - beta) * loss.item()
-            
-            if batch_idx > 0 and best_loss > 4 * min(losses):
-                break
-            
-            lrs.append(lr)
-            losses.append(best_loss)
-            
-            loss.backward()
-            optimizer.step()
-        
-        # رسم نمودار
-        plt.figure(figsize=(10, 6))
-        plt.plot(lrs, losses)
-        plt.xscale('log')
-        plt.xlabel('Learning Rate')
-        plt.ylabel('Loss')
-        plt.title('Learning Rate Finder')
-        plt.grid(True, alpha=0.3)
-        plt.show()
-        
-        return lrs, losses
-
-
-# ============================================
-# تابع تست
-# ============================================
-
-def test_trainer():
-    """تست trainer با داده نمونه"""
-    print("🧪 تست ExamTrainer")
-    print("="*60)
-    
-    from exam_models import ExamMLP
-    
-    # داده نمونه
-    X_train = np.random.randn(1000, 10)
-    y_train = np.random.randn(1000)
-    X_val = np.random.randn(200, 10)
-    y_val = np.random.randn(200)
-    
-    # ایجاد مدل
-    model = ExamMLP(input_dim=10, hidden_dims=[64, 32], output_dim=1)
-    
-    # ایجاد trainer
-    trainer = ExamTrainer(model, model_type='mlp', model_name='test_model')
-    
-    # ایجاد dataloader
-    trainer.create_dataloaders(X_train, y_train, X_val, y_val, batch_size=32)
-    
-    # آموزش
-    trainer.train(epochs=10, verbose=True)
-    
-    # رسم تاریخچه
-    trainer.plot_history('plots/test_history.jpg')
-    
-    print("\n✅ تست با موفقیت انجام شد")
-
-
-if __name__ == "__main__":
-    test_trainer()
